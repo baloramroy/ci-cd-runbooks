@@ -1,7 +1,4 @@
 # ci-cd-runbooks
-
-*A comprehensive collection of end-to-end CI/CD setup guides, standard operating procedures (SOPs), and architectural documentation for modern DevOps toolchains.*
-
 This repository serves as the central knowledge base for designing, implementing, and managing complete CI/CD pipelines. It contains step-by-step runbooks, best practices, and reference architectures covering the entire software delivery lifecycle — from code commit to production deployment.
 
 ### What's Inside
