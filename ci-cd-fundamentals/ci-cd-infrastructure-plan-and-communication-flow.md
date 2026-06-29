@@ -1,4 +1,4 @@
-# CI/CD Architecture Diagram and Communication Flow Overview
+# CI/CD Infrastructure Plan and Communication Flow Overview
 
 ## 1. Objective
 
