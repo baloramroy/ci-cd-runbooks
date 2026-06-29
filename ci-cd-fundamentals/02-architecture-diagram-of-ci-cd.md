@@ -1,4 +1,4 @@
-# CI CD Architecture Diagram
+# CI/CD Architecture and Workflow Guide
 
 ## Introduction:
 
@@ -21,10 +21,10 @@
 
 This architecture follows the **GitOps model**, where the **Git repository** serves as the **single source of truth** for the Kubernetes cluster.
 
-- Every deployment change is committed to Git.
-- Argo CD continuously monitors the repository.
-- The Kubernetes cluster is automatically synchronized with the desired state stored in Git.
-- Manual changes made directly to the cluster are considered drift and are reconciled by Argo CD
+- Every deployment change is **committed** to Git.
+- Argo CD continuously **monitors** the **repository**.
+- The Kubernetes cluster is automatically **synchronized** with the desired state stored in Git.
+- **Manual** changes made directly to the cluster are considered drift and are **reconciled** by **Argo CD**
 
 ---
 
@@ -267,20 +267,22 @@ In this approach, **Argo CD Image Updater** is responsible for automatically upd
 
 **Two deployment approaches are presented in this document:**
 
-- Approach 1: Jenkins updates the deployment manifest after a successful build. This approach is simple and widely used in traditional CI/CD environments.
+- `Approach 1:` \
+  **Jenkins** updates the **deployment manifest** after a successful build. This approach is simple and widely used in **traditional CI/CD environments.**
 
-- Approach 2: Argo CD Image Updater automatically updates the deployment manifest when a new container image is available. This approach follows GitOps principles more closely by separating image publishing from deployment automation.
+- `Approach 2:` \
+  **Argo CD** Image Updater automatically updates the **deployment manifest** when a new container image is available. This approach follows **GitOps principles** more closely by separating image publishing from deployment automation.
 
 >[!Note]
 **Image Tags:**\
-**Note:** Kubernetes manifests do not contain the container image itself. They only reference the container image stored in Docker Hub (for example, myapp:v1). During deployment, Kubernetes pulls the image from the container registry.
+**Note:** Kubernetes **manifests** do not contain the **container image itself**. They only **reference** the **container image** stored in **Docker Hub** (for example, myapp:v1). During **deployment**, Kubernetes **pulls** the image from the container **registry**.
 
 ---
 
 ## Complete Architecture
 
 >[!Note]
-The following diagrams provide a simplified, high-level view of the complete CI/CD workflow. Refer to the individual CI and CD diagrams for detailed process flows.
+The following diagrams provide a simplified, **high-level** view of the complete **CI/CD workflow**. Refer to the individual **CI** and **CD** diagrams for detailed process flows.
 
 ### Complete Architecture (Jenkins approach)
 
@@ -323,7 +325,7 @@ Kubernetes API Server
 Worker Nodes
 ```
 
-This approach follows a **Jenkins-managed GitOps** workflow, where Jenkins is responsible for updating the **deployment manifests** before Argo CD synchronizes the cluster.
+◼️ This approach follows a **Jenkins-managed GitOps** workflow, where Jenkins is responsible for updating the **deployment manifests** before Argo CD synchronizes the cluster.
 
 - Jenkins builds and pushes the Docker image.
 - Jenkins updates `deployment.yaml` with the new image tag.
@@ -372,7 +374,7 @@ Git Repository (Kubernetes Manifests)
         Kubernetes Cluster
 ```
 
-This is a **modern GitOps architecture**, where:
+◼️ This is a **modern GitOps architecture**, where:
 
 * **Jenkins** is responsible only for CI.
 * **Argo CD Image Updater** is responsible for updating the image tag in Git.
