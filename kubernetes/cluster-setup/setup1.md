@@ -11,6 +11,10 @@ Kubernetes cluster installation consists of two separate processes.
 
 This documentation follows these two stages to build a Kubernetes cluster with one control-plane node and two worker nodes.
 
+> [!NOTE]
+> This guide targets RHEL-family distributions: **RHEL 9, Rocky Linux 9, or AlmaLinux 9**.
+> Commands use `dnf` and assume a user with `admin` privileges.
+
 # Part 1: Prepare the Nodes
 
 ## 1. Lab Architecture
@@ -48,9 +52,9 @@ The following IP addresses and hostnames are examples. Replace them with the act
 
 | Node          | Hostname       | Example IP      | Role                                     |
 | ------------- | -------------- | --------------- | ---------------------------------------- |
-| Control Plane | `k8s-master`   | `192.168.10.10` | Runs Kubernetes control-plane components |
-| Worker 01     | `k8s-worker01` | `192.168.10.11` | Runs application workloads               |
-| Worker 02     | `k8s-worker02` | `192.168.10.12` | Runs application workloads               |
+| Control Plane | `k8s-master`   | `192.168.0.71` | Runs Kubernetes control-plane components |
+| Worker 01     | `k8s-worker01` | `192.168.0.72` | Runs application workloads               |
+| Worker 02     | `k8s-worker02` | `192.168.0.73` | Runs application workloads               |
 
 ## 2. Prerequisites
 
@@ -59,7 +63,7 @@ Before installing Kubernetes components, verify that all three machines meet the
 | Requirement            | Control Plane | Worker Nodes  |
 | ---------------------- | ------------- | ------------- |
 | Linux operating system | Required      | Required      |
-| CPU                    | 2 minimum     | 2 recommended |
+| CPU                    | 2 minimum     | 2 minimum     |
 | RAM                    | 2 GB minimum  | 2 GB minimum  |
 | Unique hostname        | Required      | Required      |
 | Unique MAC address     | Required      | Required      |
@@ -70,27 +74,27 @@ Before installing Kubernetes components, verify that all three machines meet the
 
 ### 2.1 Verify the Operating System
 
-Run on all nodes:
+- Run on all nodes:
 
-```bash
-cat /etc/os-release
-```
+  ```bash
+  cat /etc/os-release
+  ```
 
-Check the Linux kernel version:
+- Check the Linux kernel version:
 
-```bash
-uname -r
-```
+  ```bash
+  uname -r
+  ```
 
-Kubernetes relies on Linux kernel features for container execution, networking, and other cluster operations.
+- Kubernetes relies on Linux kernel features for container execution, networking, and other cluster operations.
 
 ### 2.2 Verify the Product UUID
 
-Run on all nodes:
+- Run on all nodes:
 
-```bash
-cat /sys/class/dmi/id/product_uuid
-```
+  ```bash
+  cat /sys/class/dmi/id/product_uuid
+  ```
 
 > [!IMPORTANT] 
 Compare the output from all three machines and ensure that each node has a unique product UUID. 
@@ -102,355 +106,466 @@ Assign a unique hostname to each node.
 
 ### 3.1 Control Plane
 
-Run on the control-plane node:
+- Run on the control-plane node:
 
-```bash
-hostnamectl set-hostname k8s-master
-```
+  ```bash
+  hostnamectl set-hostname k8s-master
+  ```
 
 ### 3.2 Worker 01
 
-Run on the first worker node:
+- Run on the first worker node:
 
-```bash
-hostnamectl set-hostname k8s-worker01
-```
+  ```bash
+  hostnamectl set-hostname k8s-worker01
+  ```
 
 ### 3.3 Worker 02
 
-Run on the second worker node:
+- Run on the second worker node:
 
-```bash
-hostnamectl set-hostname k8s-worker02
-```
+  ```bash
+  hostnamectl set-hostname k8s-worker02
+  ```
 
 ### 3.4 Verify the Hostname
 
-Run on each node:
+- Run on each node:
 
-```bash
-hostname
-```
+  ```bash
+  hostname
+  ```
 
-Expected output:
+- Expected output:
 
-* Control Plane: `k8s-master`
-* Worker 01: `k8s-worker01`
-* Worker 02: `k8s-worker02`
+  * Control Plane: `k8s-master`
+  * Worker 01: `k8s-worker01`
+  * Worker 02: `k8s-worker02`
 
 ## 4. Configure Network Connectivity
 
-All three nodes must be able to communicate with each other over the network.
+All **three nodes** must be able to communicate with each other over the network.
 
 ### 4.1 Configure Hostname Resolution
 
-On **all three nodes**, open the `/etc/hosts` file:
+- On **all three nodes**, open the `/etc/hosts` file:
 
-```bash
-vim /etc/hosts
-```
+  ```bash
+  vim /etc/hosts
+  ```
 
-Add the following entries, adjusting the IP addresses if necessary:
+- Add the following entries, adjusting the IP addresses if necessary:
 
-```text
-192.168.10.10 k8s-master
-192.168.10.11 k8s-worker01
-192.168.10.12 k8s-worker02
-```
+  ```text
+  192.168.10.10 k8s-master
+  192.168.10.11 k8s-worker01
+  192.168.10.12 k8s-worker02
+  ```
 
-Save the file.
+> Save the file.
 
 ### 4.2 Verify Name Resolution and Connectivity
 
-Run the following commands from each node:
+- Run the following commands from each node:
 
-```bash
-ping -c 3 k8s-master
-ping -c 3 k8s-worker01
-ping -c 3 k8s-worker02
-```
+  ```bash
+  ping -c 3 k8s-master
+  ping -c 3 k8s-worker01
+  ping -c 3 k8s-worker02
+  ```
 
-Verify the node's routing table:
+- Verify the node's routing table:
 
-```bash
-ip route
-```
+  ```bash
+  ip route
+  ```
 
-Confirm that the network interface used for Kubernetes communication has the correct IP address and routing configuration.
+- Confirm that the network interface used for Kubernetes communication has the correct IP address and routing configuration.
 
-> [!IMPORTANT] 
-If a machine has multiple network interfaces, ensure Kubernetes uses the appropriate interface for node-to-node communication. Successful ping tests are useful but do not replace verification of the required Kubernetes ports and firewall rules.
+> [!IMPORTANT]
+If a machine has multiple network interfaces, ensure Kubernetes uses the appropriate interface for node-to-node communication. Successful ping tests are useful but do not replace verification of the required Kubernetes ports and firewall rules (see Section 5).
 
 ---
 
-## 5. Disable Swap
+## 5. Configure the Firewall
+
+RHEL-family systems run `firewalld` by default. Open the required ports on each node, or disable the firewall for an isolated lab.
+
+### 5.1 Required Ports
+
+**Control Plane**
+
+| Port        | Protocol | Purpose                  |
+| ----------- | -------- | ------------------------ |
+| 6443        | TCP      | Kubernetes API server    |
+| 2379-2380   | TCP      | etcd client and peer API |
+| 10250       | TCP      | Kubelet API              |
+| 10257       | TCP      | kube-controller-manager  |
+| 10259       | TCP      | kube-scheduler           |
+
+**Worker Nodes**
+
+| Port        | Protocol | Purpose                  |
+| ----------- | -------- | ------------------------ |
+| 10250       | TCP      | Kubelet API              |
+| 10256       | TCP      | kube-proxy               |
+| 30000-32767 | TCP      | NodePort Services        |
+
+> [!NOTE]
+Your CNI plugin may require additional ports (for example, VXLAN uses UDP 4789 or 8472). Check the plugin documentation before Part 2.
+
+### 5.2 Open the Ports on the Control Plane
+
+```bash
+firewall-cmd --permanent --add-port=6443/tcp
+firewall-cmd --permanent --add-port=2379-2380/tcp
+firewall-cmd --permanent --add-port=10250/tcp
+firewall-cmd --permanent --add-port=10257/tcp
+firewall-cmd --permanent --add-port=10259/tcp
+firewall-cmd --reload
+```
+
+### 5.3 Open the Ports on Worker Nodes
+
+```bash
+firewall-cmd --permanent --add-port=10250/tcp
+firewall-cmd --permanent --add-port=10256/tcp
+firewall-cmd --permanent --add-port=30000-32767/tcp
+firewall-cmd --reload
+```
+
+### 5.4 Verify the Rules
+
+```bash
+firewall-cmd --list-ports
+```
+
+### 5.5 Alternative: Disable the Firewall (Lab Only)
+
+```bash
+systemctl disable --now firewalld
+```
+
+> [!IMPORTANT]
+Do not disable the firewall in production environments.
+
+---
+
+## 6. Configure SELinux
+
+SELinux is enforcing by default on RHEL-family systems. The kubeadm installation guide requires permissive mode. Perform these steps on **all three nodes**.
+
+### 6.1 Set SELinux to Permissive Mode
+
+- Run
+
+  ```bash
+  setenforce 0
+  sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+  ```
+
+### 6.2 Verify SELinux Status
+
+- Varify
+
+  ```bash
+  getenforce
+  ```
+
+- Expected output:
+
+  ```text
+  Permissive
+  ```
+
+---
+## 7. Disable Swap
 
 For this lab, swap will be disabled on all nodes. This is the conventional kubeadm configuration and avoids the default kubelet behavior of refusing to start when swap is enabled.
 
-### 5.1 Check Swap Status
+### 7.1 Check Swap Status
 
-Run on all nodes:
+- Run on all nodes:
 
-```bash
-swapon --show
-```
+  ```bash
+  swapon --show
+  ```
 
-If swap is enabled, the command displays the active swap devices or files.
+- If swap is enabled, the command displays the active swap devices or files.
 
-### 5.2 Disable Swap Temporarily
-
-```bash
-sudo swapoff -a
-```
-
-This disables active swap until it is enabled again or the machine reboots with swap configured.
-
-### 5.3 Disable Swap Permanently
-
-Open the filesystem configuration file:
+### 7.2 Disable Swap Temporarily
 
 ```bash
-sudo vi /etc/fstab
+swapoff -a
 ```
 
-Locate the swap entry and comment it out. For example:
+- This disables active swap until it is enabled again or the machine reboots with swap configured.
 
-```text
-# /swap.img none swap sw 0 0
-```
+### 7.3 Disable Swap Permanently
 
-The actual entry may differ depending on the operating system. Do not comment out unrelated filesystem entries.
+- Open the filesystem configuration file:
 
-### 5.4 Verify Swap Status
+  ```bash
+  vim /etc/fstab
+  ```
+
+- Locate the swap entry and comment it out. For example:
+
+  ```text
+  # /dev/mapper/rhel-swap none swap defaults 0 0
+  ```
+
+>[!Note]
+>The actual entry may differ depending on your installation (for example, `/dev/mapper/rl-swap` on Rocky Linux). Do not comment out unrelated filesystem entries.
+
+### 7.4 Verify Swap Status
 
 ```bash
 swapon --show
 free -h
 ```
 
-Expected result: `swapon --show` displays no active swap devices, and the `free -h` output shows zero swap usage and total swap capacity if no other swap device is configured.
+- Expected result: `swapon --show` displays no active swap devices, and 
+- The `free -h` output shows zero swap usage and total swap capacity if no other swap device is configured.
 
-## 6. Load Required Kernel Modules
+## 8. Load Required Kernel Modules
 
 Kubernetes container networking requires kernel support for operations such as overlay filesystems and bridge traffic processing.
 
-Perform the following steps on **all three nodes**.
+>[!Note]
+>Perform the following steps on **all three nodes**.
 
-### 6.1 Load the Modules
+### 8.1 Load the Modules
 
-```bash
-sudo modprobe overlay
-sudo modprobe br_netfilter
-```
+- Run
+
+  ```bash
+  modprobe overlay
+  modprobe br_netfilter
+  ```
 
 * `overlay`: Enables the overlay filesystem used by many container images and writable container layers.
 * `br_netfilter`: Allows bridged network traffic to be processed by applicable Netfilter rules.
 
-### 6.2 Make the Modules Persistent
+### 8.2 Make the Modules Persistent
 
-Create a module configuration file:
+- Create a module configuration file:
 
-```bash
-cat <<EOF | tee /etc/modules-load.d/k8s.conf
-overlay
-br_netfilter
-EOF
-```
+  ```bash
+  cat <<EOF | tee /etc/modules-load.d/k8s.conf
+  overlay
+  br_netfilter
+  EOF
+  ```
 
-The configuration ensures that these modules are loaded automatically during subsequent boots.
+- The configuration ensures that these modules are loaded automatically during subsequent boots.
 
-### 6.3 Verify the Modules
+### 8.3 Verify the Modules
 
-```bash
-lsmod | grep overlay
-lsmod | grep br_netfilter
-```
+- Run:
+
+  ```bash
+  lsmod | grep overlay
+  lsmod | grep br_netfilter
+  ```
 
 Both modules should appear in the output.
 
-## 7. Configure Kubernetes Networking Parameters
+## 9. Configure Kubernetes Networking Parameters
 
 Kubernetes networking requires IP forwarding and appropriate Netfilter settings.
 
-Perform these steps on **all three nodes**.
+>[!Note]
+>Perform these steps on **all three nodes**.
 
-### 7.1 Create the Sysctl Configuration
+### 9.1 Create the Sysctl Configuration
 
-Create the configuration file:
+- Create the configuration file:
 
-```bash
-vim /etc/sysctl.d/k8s.conf
-```
+  ```bash
+  vim /etc/sysctl.d/k8s.conf
+  ```
 
-Add the following settings:
+- Add the following settings:
 
-```text
-net.bridge.bridge-nf-call-iptables = 1
-net.bridge.bridge-nf-call-ip6tables = 1
-net.ipv4.ip_forward = 1
-```
+  ```text
+  net.bridge.bridge-nf-call-iptables = 1
+  net.bridge.bridge-nf-call-ip6tables = 1
+  net.ipv4.ip_forward = 1
+  ```
 
-### 7.2 Apply the Settings
+### 9.2 Apply the Settings
 
-```bash
-sysctl --system
-```
+- This command reloads applicable system-wide sysctl configuration files.
 
-This command reloads applicable system-wide sysctl configuration files.
+  ```bash
+  sysctl --system
+  ```
 
-### 7.3 Verify IP Forwarding
+### 9.3 Verify IP Forwarding
 
-```bash
-sysctl net.ipv4.ip_forward
-```
+- run:
 
-Expected output:
+  ```bash
+  sysctl net.ipv4.ip_forward
+  sysctl net.bridge.bridge-nf-call-iptables
+  sysctl net.bridge.bridge-nf-call-ip6tables
+  ```
 
-```text
-net.ipv4.ip_forward = 1
-```
+- Expected values for all parameters:
 
-Verify the bridge Netfilter parameters as well:
-
-```bash
-sysctl net.bridge.bridge-nf-call-iptables
-sysctl net.bridge.bridge-nf-call-ip6tables
-```
-
-Expected values for both parameters:
-
-```text
-= 1
-```
+  ```text
+  = 1
+  ```
 ---
 
-## 8. Install and Configure containerd
+## 10. Install and Configure containerd
 
 Containerd is the container runtime that Kubernetes uses to manage container images and containers. Perform the following steps on **all three nodes**.
 
-### 8.1 Install Required Repository Management Tools
+### 10.1 Install Required Repository Management Tools
 
 ```bash
-sudo dnf install -y dnf-plugins-core
+dnf install -y dnf-plugins-core
 ```
 
-### 8.2 Configure the Docker Repository
 
-Add the official Docker repository for RHEL:
+### 10.2 Configure the Docker Repository
+
+Add the official Docker repository.
+
+- **RHEL 8 / 9 (dnf4):**
+
+  ```bash
+  dnf config-manager --add-repo \
+  https://download.docker.com/linux/rhel/docker-ce.repo
+  ```
+
+- **RHEL 10 / Fedora 41+ (dnf5):**
+
+  ```bash
+  dnf config-manager addrepo \
+  --from-repofile=https://download.docker.com/linux/rhel/docker-ce.repo
+  ```
+
+  > [!NOTE]
+  Rocky Linux and AlmaLinux users commonly use `https://download.docker.com/linux/centos/docker-ce.repo` instead.
+
+- Verify the repository:
+
+  ```bash
+  dnf repolist
+  ```
+
+### 10.3 Install containerd
 
 ```bash
-sudo dnf config-manager --add-repo \
-https://download.docker.com/linux/rhel/docker-ce.repo
+dnf install containerd.io
 ```
 
-Verify the repository:
+- Verify the installed version:
 
-```bash
-sudo dnf repolist
-```
+  ```bash
+  containerd --version
+  rpm -q containerd.io
+  ```
 
-### 8.3 Install containerd
-
-```bash
-sudo dnf install -y containerd.io
-```
-
-Verify the installed version:
-
-```bash
-containerd --version
-rpm -q containerd.io
-```
-
-### 8.4 Generate the containerd Configuration
+### 10.4 Generate the containerd Configuration
 
 Create the configuration directory and generate the default configuration:
 
 ```bash
-sudo mkdir -p /etc/containerd
+mkdir -p /etc/containerd
 
-containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
+containerd config default | tee /etc/containerd/config.toml > /dev/null
 ```
 
 Configuration file: `/etc/containerd/config.toml`
 
-### 8.5 Configure the Systemd Cgroup Driver
+### 10.5 Configure the Systemd Cgroup Driver
 
-Open the configuration file:
+- Open the configuration file:
 
-```bash
-sudo vi /etc/containerd/config.toml
-```
+  ```bash
+  vim /etc/containerd/config.toml
+  ```
 
-Locate the `runc` runtime options section and set:
+- Locate the `runc` runtime options section and set:
 
-```toml
-SystemdCgroup = true
-```
+  ```toml
+  SystemdCgroup = true
+  ```
 
 Ensure the setting is under the correct runtime section for your installed containerd version. Also ensure that the CRI plugin is not disabled.
 
 **Purpose:** Aligns containerd with the systemd cgroup driver used by the kubelet and supports cgroup v2.
 
-### 8.6 Enable and Start containerd
+### 10.6 Enable and Start containerd
 
 ```bash
-sudo systemctl enable --now containerd
+systemctl enable --now containerd
 ```
 
-Verify the service status:
+- Verify the service status:
 
-```bash
-sudo systemctl status containerd
-```
+  ```bash
+  systemctl status containerd
+  ```
 
-Expected status:
+- Expected status:
 
-```text
-Active: active (running)
-```
+  ```text
+  Active: active (running)
+  ```
 
-If the service fails to start, check the logs:
+- If the service fails to start, check the logs:
 
-```bash
-sudo journalctl -u containerd -xe --no-pager
-```
+  ```bash
+  journalctl -u containerd -xe --no-pager
+  ```
 
-### 8.7 Verify the Configuration
+### 10.7 Verify the Configuration
 
-Check whether containerd is running and enabled at boot:
+- **Check whether containerd is running and enabled at boot:**
 
-```bash
-sudo systemctl is-active containerd
-sudo systemctl is-enabled containerd
-```
+  ```bash
+  systemctl is-active containerd
+  systemctl is-enabled containerd
+  ```
 
-Expected output:
+  Expected output:
 
-```text
-active
-enabled
-```
+  ```text
+  active
+  enabled
+  ```
 
-Verify the cgroup driver setting:
+  Verify the cgroup driver setting:
 
-```bash
-sudo grep -n 'SystemdCgroup' /etc/containerd/config.toml
-```
+  ```bash
+  grep -n 'SystemdCgroup' /etc/containerd/config.toml
+  ```
 
-Check whether the node uses cgroup v2:
 
-```bash
-stat -fc %T /sys/fs/cgroup/
-```
+- **Check which cgroup version the node uses:**
 
-Expected output:
+  ```bash
+  stat -fc %T /sys/fs/cgroup/
+  ```
 
-```text
-cgroup2fs
-```
+  Expected output:
 
-### 8.8 Repeat on All Nodes
+  | Output     | Meaning   | Typical OS  |
+  | ---------- | --------- | ----------- |
+  | `cgroup2fs` | cgroup v2 | RHEL 9+     |
+  | `tmpfs`    | cgroup v1 | RHEL 8      |
+
+> [!NOTE]
+Either version works with `SystemdCgroup = true`. This guide assumes RHEL 9 (cgroup v2).
+
+
+
+### 10.8 Repeat on All Nodes
 
 Complete the installation and configuration on `k8s-master`, `k8s-worker01`, and `k8s-worker02`.
 
