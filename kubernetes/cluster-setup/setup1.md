@@ -157,9 +157,9 @@ All **three nodes** must be able to communicate with each other over the network
 - Add the following entries, adjusting the IP addresses if necessary:
 
   ```text
-  192.168.10.10 k8s-master
-  192.168.10.11 k8s-worker01
-  192.168.10.12 k8s-worker02
+  192.168.0.71 k8s-master
+  192.168.0.72 k8s-worker01
+  192.168.0.73 k8s-worker02
   ```
 
 > Save the file.
@@ -330,7 +330,7 @@ free -h
 
 ## 8. Load Required Kernel Modules
 
-Kubernetes container networking requires kernel support for operations such as overlay filesystems and bridge traffic processing.
+Kubernetes container runtime and networking require kernel support for operations such as overlay filesystems and bridge traffic processing.
 
 >[!Note]
 >Perform the following steps on **all three nodes**.
